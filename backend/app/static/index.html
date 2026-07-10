@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>微信公众号文章监控</title>
+<link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, "Microsoft YaHei", "Helvetica Neue", sans-serif; background:#f0f2f5; color:#303133; }
+
+#app { display:flex; height:100vh; }
+
+.sidebar { width:220px; background:#304156; color:#fff; display:flex; flex-direction:column; flex-shrink:0; }
+.sidebar .logo { padding:20px 24px; font-size:16px; font-weight:500; letter-spacing:1px; border-bottom:1px solid rgba(255,255,255,0.07); }
+.sidebar nav { flex:1; padding:12px 0; }
+.sidebar nav .item { padding:13px 24px; font-size:14px; cursor:pointer; color:rgba(255,255,255,0.6); border-left:3px solid transparent; transition:all .2s; }
+.sidebar nav .item:hover { color:#fff; background:rgba(255,255,255,0.04); }
+.sidebar nav .item.on { color:#fff; background:rgba(255,255,255,0.08); border-left-color:#409EFF; }
+
+.main { flex:1; display:flex; flex-direction:column; min-width:0; }
+.main .head { height:48px; background:#fff; border-bottom:1px solid #e4e7ed; display:flex; align-items:center; padding:0 20px; justify-content:space-between; }
+.main .head .title { font-size:15px; font-weight:600; }
+
+.body { flex:1; padding:16px 16px 40px; overflow-y:auto; }
+
+.card { background:#fff; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.04); padding:16px; margin-bottom:16px; }
+.card>.headline { font-size:14px; font-weight:600; margin-bottom:14px; color:#303133; }
+
+input, select { font-size:13px; height:32px; border:1px solid #dcdfe6; border-radius:4px; padding:0 10px; outline:none; background:#fff; color:#606266; }
+input:focus, select:focus { border-color:#409EFF; }
+select { cursor:pointer; min-width:100px; }
+
+.btn { display:inline-flex; align-items:center; justify-content:center; height:32px; padding:0 15px; font-size:13px; border-radius:4px; cursor:pointer; border:none; font-weight:400; transition:.15s; white-space:nowrap; }
+.btn:disabled { opacity:.55; cursor:not-allowed; }
+.btn-blue { background:#409EFF; color:#fff; } .btn-blue:hover { background:#3a8ee6; }
+.btn-green { background:#67c23a; color:#fff; } .btn-green:hover { background:#5aaf31; }
+.btn-orange { background:#e6a23c; color:#fff; } .btn-orange:hover { background:#cf9236; }
+.btn-red { background:#f56c6c; color:#fff; } .btn-red:hover { background:#e06060; }
+.btn-white { background:#fff; color:#606266; border:1px solid #dcdfe6; } .btn-white:hover { color:#409EFF; border-color:#c6e2ff; }
+.btn-sm { height:28px; padding:0 10px; font-size:12px; }
+
+.filter-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+.art-table { width:100%; border-collapse:collapse; font-size:13px; }
+.art-table th { background:#f5f7fa; padding:10px 12px; text-align:left; font-weight:500; color:#909399; border-bottom:1px solid #ebeef5; font-size:12px; }
+.art-table td { padding:10px 12px; border-bottom:1px solid #ebeef5; }
+.art-table tr { cursor:pointer; transition:background .15s; }
+.art-table tr:hover td { background:#f5f7fa; }
+.art-table .title-col { max-width:0; }
+.art-table .title-col .text { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#303133; }
+.art-table .meta { color:#909399; font-size:12px; }
+
+.tag { display:inline-block; padding:0 8px; height:20px; line-height:20px; border-radius:3px; font-size:11px; }
+.tag-new { background:#fdf6ec; color:#e6a23c; }
+.tag-done { background:#f4f4f5; color:#909399; }
+.tag-ok { background:#f0f9eb; color:#67c23a; }
+.tag-bad { background:#fef0f0; color:#f56c6c; }
+
+.sub-row { display:flex; align-items:center; padding:12px 0; border-bottom:1px solid #ebeef5; gap:12px; }
+.sub-row:last-child { border-bottom:none; }
+.sub-row .info { flex:1; min-width:0; }
+.sub-row .info .name { font-size:14px; font-weight:500; }
+.sub-row .info .desc { font-size:12px; color:#909399; margin-top:2px; }
+.sub-row .act { display:flex; gap:6px; align-items:center; }
+
+.form-row { display:flex; align-items:center; margin-bottom:14px; gap:12px; }
+.form-row label { width:90px; font-size:13px; font-weight:500; color:#606266; text-align:right; flex-shrink:0; }
+.form-row input { flex:1; }
+
+.stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+.stats .box { background:#f5f7fa; border-radius:6px; padding:16px; text-align:center; }
+.stats .box .num { font-size:24px; font-weight:700; color:#303133; }
+.stats .box .lbl { font-size:12px; color:#909399; margin-top:4px; }
+
+.overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px; }
+.overlay .dlg { background:#fff; border-radius:8px; width:600px; max-width:100%; max-height:80vh; display:flex; flex-direction:column; }
+.overlay .dlg .hdr { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1px solid #eee; }
+.overlay .dlg .hdr span { font-weight:600; font-size:15px; }
+.overlay .dlg .hdr button { background:none; border:none; font-size:18px; cursor:pointer; color:#909399; }
+.overlay .dlg .cnt { flex:1; overflow-y:auto; padding:20px; line-height:2.0; font-size:14px; white-space:pre-wrap; color:#303133; }
+.overlay .dlg .ftr { padding:12px 20px; border-top:1px solid #eee; display:flex; gap:8px; justify-content:flex-end; }
+
+.help { font-size:13px; line-height:2.2; color:#606266; }
+.help code { background:#f0f2f5; padding:1px 6px; border-radius:3px; font-size:12px; color:#e6a23c; }
+
+.loading-overlay { display:flex; align-items:center; justify-content:center; padding:40px; color:#909399; font-size:14px; }
+.empty-state { text-align:center; padding:50px 20px; color:#909399; font-size:14px; }
+
+@media (max-width:768px) {
+  .sidebar { width:60px; }
+  .sidebar .logo span, .sidebar nav .item span { display:none; }
+  .sidebar nav .item { justify-content:center; padding:13px; }
+  .art-table .meta, .art-table .act-col { display:none; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside class="sidebar">
+    <div class="logo"><span>公众号监控</span></div>
+    <nav>
+      <div class="item" :class="{on:tab==='articles'}" @click="tab='articles'"><span>文章列表</span></div>
+      <div class="item" :class="{on:tab==='subs'}" @click="tab='subs'"><span>公众号管理</span></div>
+      <div class="item" :class="{on:tab==='settings'}" @click="tab='settings'"><span>系统设置</span></div>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <div class="head">
+      <span class="title">{{{articles:'文章列表',subs:'公众号管理',settings:'系统设置'}[tab]}}</span>
+      <button class="btn btn-sm" :class="authOk ? 'btn-green' : 'btn-orange'" @click="checkAuth">
+        {{ authOk ? '微信已登录' : '微信未登录' }}
+      </button>
+    </div>
+
+    <div class="body">
+      <div v-show="tab==='articles'">
+        <div class="card">
+          <div class="filter-bar">
+            <select v-model="f.sub_id">
+              <option :value="null">全部公众号</option>
+              <option v-for="s in subs" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+            <input type="date" v-model="f.date" style="width:150px">
+            <select v-model="f.read">
+              <option :value="null">全部状态</option>
+              <option :value="false">未读</option>
+              <option :value="true">已读</option>
+            </select>
+            <button class="btn btn-blue" @click="loadArticles">筛选</button>
+            <button class="btn btn-white" @click="resetFilter">重置</button>
+            <button class="btn btn-green" @click="syncAll" :disabled="loading" title="从微信公众平台拉取最新文章">
+              {{ loading ? '获取中...' : '获取最新文章' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="card" v-if="articles.length">
+          <table class="art-table">
+            <thead>
+              <tr><th style="width:auto">标题</th><th style="width:130px">来源</th><th style="width:100px">日期</th><th style="width:60px">状态</th><th style="width:80px">AI 摘要</th><th style="width:90px">操作</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in articles" :key="a.id" @click="openUrl(a.url)">
+                <td class="title-col"><span class="text">{{ a.title }}</span></td>
+                <td class="meta">{{ a.subscription_name }}</td>
+                <td class="meta">{{ a.publish_date }}</td>
+                <td><span :class="'tag '+(a.is_read?'tag-done':'tag-new')">{{ a.is_read ? '已读' : '新' }}</span></td>
+                <td>
+                  <button class="btn btn-sm btn-white" @click.stop="showSum(a)">{{ a.summary ? '查看' : '生成' }}</button>
+                </td>
+                <td>
+                  <button class="btn btn-sm" :class="a.is_read ? 'btn-orange' : 'btn-white'" @click.stop="markRead(a.id)">
+                    {{ a.is_read ? '取消已读' : '标已读' }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card empty-state" v-else>{{ loading ? '加载中...' : '暂无文章，请先添加公众号并获取文章' }}</div>
+      </div>
+
+      <div v-show="tab==='subs'">
+        <div class="card">
+          <div style="display:flex;gap:10px;margin-bottom:14px">
+            <input v-model="subName" placeholder="输入公众号名称，系统自动搜索" style="width:320px" @keyup.enter="addSub">
+            <button class="btn btn-blue" @click="addSub" :disabled="adding">{{ adding ? '搜索中...' : '添加公众号' }}</button>
+          </div>
+          <div v-if="addErr" style="color:#f56c6c;font-size:13px;margin-bottom:10px">{{ addErr }}</div>
+
+          <div v-if="subs.length">
+            <div class="sub-row" v-for="s in subs" :key="s.id">
+              <div class="info">
+                <div class="name">{{ s.name }}</div>
+                <div class="desc">
+                  添加于 {{ s.added_at?.slice(0,10) }}
+                  <span v-if="s.last_sync_at"> &middot; 上次获取 {{ s.last_sync_at?.slice(0,16) }}</span>
+                  <span v-else> &middot; 从未获取</span>
+                </div>
+              </div>
+              <div class="act">
+                <span :class="'tag '+(s.status==='active'?'tag-ok':'tag-bad')">{{ s.status==='active'?'正常':'停用' }}</span>
+                <button class="btn btn-sm btn-white" @click="syncSub(s.id)" :disabled="syncingId===s.id">{{ syncingId===s.id?'...':'获取文章' }}</button>
+                <button class="btn btn-sm btn-white" @click="toggleSub(s)">{{ s.status==='active'?'停用':'启用' }}</button>
+                <button class="btn btn-sm btn-red" @click="delSub(s.id)">删除</button>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-state">还没有添加公众号，在上方输入名称添加</div>
+        </div>
+      </div>
+
+      <div v-show="tab==='settings'">
+        <div class="card">
+          <div class="headline">AI 配置（用于生成文章摘要）</div>
+          <div class="form-row">
+            <label>API Key</label>
+            <input v-model="ai.key" type="password" placeholder="Gemini API Key">
+          </div>
+          <div class="form-row">
+            <label>API 地址</label>
+            <input v-model="ai.url" placeholder="https://generativelanguage.googleapis.com/v1">
+          </div>
+          <div class="form-row">
+            <label>模型</label>
+            <input v-model="ai.model" placeholder="gemini-1.5-flash">
+          </div>
+          <div class="form-row">
+            <label>代理地址</label>
+            <input v-model="ai.proxy" placeholder="http://172.17.0.1:10808（Docker环境用宿主机IP）">
+          </div>
+          <button class="btn btn-blue" @click="saveAI" :disabled="savingAI">{{ savingAI ? '保存中...' : '保存配置' }}</button>
+        </div>
+
+        <div class="card">
+          <div class="headline">系统状态</div>
+          <div class="stats">
+            <div class="box">
+              <div class="num" :style="{color:authOk?'#67c23a':'#f56c6c'}">{{ authOk ? '正常' : '未登录' }}</div>
+              <div class="lbl">微信登录</div>
+            </div>
+            <div class="box"><div class="num">{{ subs.length }}</div><div class="lbl">公众号</div></div>
+            <div class="box"><div class="num">{{ articles.length }}</div><div class="lbl">文章</div></div>
+            <div class="box"><div class="num">{{ unreadCount }}</div><div class="lbl">未读</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="headline">使用说明</div>
+          <div class="help">
+            <div><b>1.</b> 运行 <code>python get_cookie.py</code> 扫码登录微信公众平台</div>
+            <div><b>2.</b> 在「公众号管理」输入名称添加要监控的公众号</div>
+            <div><b>3.</b> 在「文章列表」点击「获取最新文章」拉取文章</div>
+            <div><b>4.</b> 配置 AI API Key 后可为文章生成摘要</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="summaryVis" class="overlay" @click.self="summaryVis=false">
+      <div class="dlg">
+        <div class="hdr">
+          <span>AI 学习笔记</span>
+          <button @click="summaryVis=false">&times;</button>
+        </div>
+        <div class="cnt">{{ summaryText || '暂无笔记，点击下方按钮生成' }}</div>
+        <div class="ftr">
+          <button class="btn btn-white" @click="summaryVis=false">关闭</button>
+          <button class="btn btn-blue" @click="genSummary" :disabled="genning">{{ genning ? '生成中...' : '重新生成' }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script>
+const { createApp } = Vue
+const API = axios.create({ baseURL: '/api', timeout: 120000 })
+
+createApp({
+  data() {
+    return {
+      tab: 'articles',
+      authOk: false,
+      articles: [], subs: [],
+      f: { sub_id: null, date: null, read: null },
+      loading: false,
+      subName: '', adding: false, addErr: '', syncingId: null,
+      ai: { key: '', url: 'https://generativelanguage.googleapis.com/v1', model: 'gemini-3.5-flash' },
+      savingAI: false,
+      summaryVis: false, summaryText: '', curArt: null, genning: false
+    }
+  },
+  computed: {
+    unreadCount() { return this.articles.filter(a => !a.is_read).length }
+  },
+  mounted() {
+    this.loadSubs(); this.loadArticles(); this.checkAuth(); this.loadAI()
+  },
+  methods: {
+    async checkAuth() {
+      try { const r = await API.get('/auth/status'); this.authOk = r.data.status === 'logged_in' }
+      catch { this.authOk = false }
+    },
+    async loadArticles() {
+      this.loading = true
+      try {
+        const p = {}
+        if (this.f.sub_id) p.subscription_id = this.f.sub_id
+        if (this.f.date) p.publish_date = this.f.date
+        if (this.f.read !== null && this.f.read !== undefined) p.is_read = this.f.read
+        this.articles = (await API.get('/articles', { params: p })).data
+      } catch {}
+      finally { this.loading = false }
+    },
+    resetFilter() { this.f = { sub_id: null, date: null, read: null }; this.loadArticles() },
+    async loadSubs() {
+      try { this.subs = (await API.get('/subscriptions')).data } catch {}
+    },
+    openUrl(row) { if (row.url) window.open(row.url, '_blank') },
+    async markRead(id) {
+      try { await API.put(`/articles/${id}/read`); this.loadArticles() } catch {}
+    },
+    async syncAll() {
+      this.loading = true
+      for (const s of this.subs) { try { await API.post(`/subscriptions/${s.id}/sync`) } catch {} }
+      this.loadArticles(); this.loading = false
+    },
+    async addSub() {
+      if (!this.subName.trim()) return
+      this.adding = true; this.addErr = ''
+      try { await API.post('/subscriptions', { name: this.subName.trim() }); this.subName = ''; this.loadSubs() }
+      catch (e) { this.addErr = e.response?.data?.detail || '添加失败' }
+      finally { this.adding = false }
+    },
+    async delSub(id) { try { await API.delete(`/subscriptions/${id}`); this.loadSubs() } catch {} },
+    async toggleSub(sub) {
+      try { await API.put(`/subscriptions/${sub.id}`, { status: sub.status === 'active' ? 'inactive' : 'active' }); this.loadSubs() } catch {}
+    },
+    async syncSub(id) {
+      this.syncingId = id
+      try { await API.post(`/subscriptions/${id}/sync`); this.loadSubs() } catch {}
+      finally { this.syncingId = null }
+    },
+    showSum(a) { this.curArt = a; this.summaryText = a.summary || ''; this.summaryVis = true },
+    async genSummary() {
+      if (!this.curArt) return
+      this.genning = true
+      try { const r = await API.post(`/articles/${this.curArt.id}/summary`); this.summaryText = r.data.summary; this.loadArticles() } catch {}
+      finally { this.genning = false }
+    },
+    async loadAI() {
+      try {
+        const r = (await API.get('/settings/ai')).data
+        if (r.ai_api_key) this.ai.key = r.ai_api_key
+        if (r.ai_api_base_url) this.ai.url = r.ai_api_base_url
+        if (r.ai_model) this.ai.model = r.ai_model
+        if (r.ai_proxy) this.ai.proxy = r.ai_proxy
+      } catch {}
+    },
+    async saveAI() {
+      this.savingAI = true
+      try { await API.post('/settings/ai', { api_key: this.ai.key, api_base_url: this.ai.url, model: this.ai.model, proxy: this.ai.proxy }) } catch {}
+      finally { this.savingAI = false }
+    }
+  }
+}).mount('#app')
+</script>
+</body>
+</html>

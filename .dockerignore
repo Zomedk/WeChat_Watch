@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+wechat_monitor.db
+wechat_auth_state.json
+downloads/
+node_modules/
+.git/
+*.log
