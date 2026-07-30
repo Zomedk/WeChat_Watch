@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: wechat-monitor
     ports:
-      - "8080:8000"
+      - "8000:8000"
     volumes:
       - ./backend/wechat_monitor.db:/app/wechat_monitor.db
       - ./backend/wechat_auth_state.json:/app/wechat_auth_state.json
